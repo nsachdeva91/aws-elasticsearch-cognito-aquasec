@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Parameters:
+  BucketName:
+    Type: String
+    Default: unique-bucket-name
+
+Resources:
+  LambdaBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      # BucketName: !Sub 'lambda-functions-${AWS::Region}-${AWS::AccountId}'
+      NotificationConfiguration:
+        LambdaConfigurations:
+          - Event: 's3:ObjectCreated:*'
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: load/
+                  - Name: suffix
+                    Value: .json
+            Function: !GetAtt S3ToESFunction.Arn
+  
+  S3ToESFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: S3ToElasticSearch
+      Description: Function to Stream AquaSec Logs to ES.
+      Handler: s3-to-es.handler
+      Runtime: python3.7
+      CodeUri: ./lambda-deploy/
+      Role: !GetAtt LambdaRole.Arn
+
+  S3InvokeLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref S3ToESFunction
+      Principal: s3.amazonaws.com
+      SourceArn: !Sub arn:aws:s3:::${BucketName}
+
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: '/'
+      Policies:
+      - PolicyName: root
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - logs:*
+              - es:ESHttpPost
+              - es:ESHttpPut
+            Resource: "*"
+      - PolicyName: s3
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+              - s3:Get*
+            Resource:
+              - !Sub arn:aws:s3:::${BucketName}
+              - !Sub arn:aws:s3:::${BucketName}/*

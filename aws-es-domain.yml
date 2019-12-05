@@ -1,0 +1,161 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Template to create Elastic Search Domain with Kibana and Cognito
+Parameters:
+  DomainName:
+    Type: String
+    Default: unique-domain-name
+  PoolName:
+    Type: String
+    Default: unique-pool-name
+  PoolDomain:
+    Type: String
+    Default: global-unique-pool-domain
+
+Resources:
+  AuthenticatedRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      RoleName: "kibana_es_Cognito_Auth_Role"
+      Tags:
+        - Key: "dev"
+          Value: "cloud"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: "Allow"
+          Principal:
+            Federated: "cognito-identity.amazonaws.com"
+          Action:
+          - "sts:AssumeRoleWithWebIdentity"
+      Policies:
+        - PolicyName: "kibana_es_Auth_Policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action: 
+                  - "mobileanalytics:PutEvents"
+                  - "cognito-sync:*"
+                  - "cognito-identity:*"
+                  - "es:ESHttp*"
+                Resource: "*"
+      Path: "/"
+  UnAuthenticatedRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      RoleName: "kibana_es_Cognito_Unauth_Role"
+      Tags:
+        - Key: "dev"
+          Value: "cloud"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: "Allow"
+          Principal:
+            Federated: "cognito-identity.amazonaws.com"
+          Action:
+          - "sts:AssumeRoleWithWebIdentity"
+      Policies:
+        - PolicyName: "kibana_es_Unauth_Policy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action: 
+                  - "mobileanalytics:PutEvents"
+                  - "cognito-sync:*"
+                Resource: "*"
+      Path: "/"
+  CognitoAccessForAmazonES:
+    Type: AWS::IAM::Role
+    Properties: 
+      RoleName: "CognitoAccessForAmazonES"
+      Tags:
+        - Key: "dev"
+          Value: "cloud"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: "Allow"
+          Principal:
+            Service: "es.amazonaws.com"
+          Action:
+          - "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonESCognitoAccess"
+      Path: "/"
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Ref PoolName
+      UserPoolTags: 
+        dev: "cloud"
+      AdminCreateUserConfig: 
+         AllowAdminCreateUserOnly: true
+  CognitoUserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties: 
+      Domain: !Ref PoolDomain
+      UserPoolId: !Ref CognitoUserPool
+  CognitoIdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    Properties:
+       AllowClassicFlow: true
+       AllowUnauthenticatedIdentities: true
+       IdentityPoolName: !Ref PoolName
+  IdentityPoolRoleAttachment:
+        Type: AWS::Cognito::IdentityPoolRoleAttachment
+        Properties:
+            IdentityPoolId: !Ref CognitoIdentityPool
+            Roles:
+               "authenticated": !GetAtt AuthenticatedRole.Arn
+               "unauthenticated": !GetAtt UnAuthenticatedRole.Arn
+  ElasticsearchDomain:
+    Type: AWS::Elasticsearch::Domain
+    Properties:
+      DomainName: !Ref DomainName
+      ElasticsearchVersion: "7.1"
+      ElasticsearchClusterConfig:
+        InstanceCount: "1"
+        InstanceType: "t2.small.elasticsearch"
+        # ZoneAwarenessEnabled: "true"
+        # DedicatedMasterEnabled: "true"
+        # DedicatedMasterType: "t2.small.elasticsearch"
+        # DedicatedMasterCount: "1"
+      EBSOptions:
+        EBSEnabled: true
+        Iops: 0
+        VolumeSize: 10
+        VolumeType: "standard"
+      SnapshotOptions:
+        AutomatedSnapshotStartHour: "0"
+      CognitoOptions:
+        Enabled: true 
+        IdentityPoolId: !Ref CognitoIdentityPool
+        RoleArn: !GetAtt CognitoAccessForAmazonES.Arn
+        UserPoolId: !Ref CognitoUserPool
+      AccessPolicies:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              AWS: !GetAtt AuthenticatedRole.Arn
+            Action: 
+              - "es:ESHttp*"
+            Resource: !Sub "arn:aws:es:us-east-1:846973539254:domain/${DomainName}/*"
+            # Condition:
+            #   IpAddress:
+            #     aws:SourceIp:
+            #       - "37.228.254.150"
+      AdvancedOptions:
+        rest.action.multi.allow_explicit_index: "true"
+      Tags:
+        - Key: "dev"
+          Value: "cloud"
+Outputs:
+  DomainArn:
+    Value: !GetAtt ElasticsearchDomain.DomainArn
+  DomainEndpoint:
+    Value: !GetAtt ElasticsearchDomain.DomainEndpoint
+  KibanaEndpoint:
+    Value: !Join [ "/", [!GetAtt ElasticsearchDomain.DomainEndpoint, "_plugin/kibana/"] ]

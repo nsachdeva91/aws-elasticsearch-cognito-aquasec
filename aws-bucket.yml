@@ -1,0 +1,11 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Template to create Bucket
+Resources:
+  LambdaBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: !Sub 'lambda-functions-${AWS::Region}-${AWS::AccountId}'
+Outputs:
+  BucketName:
+    Value: !Ref LambdaBucket
+    Description: Name of the sample Amazon S3 bucket.
