@@ -10,7 +10,7 @@ credentials = boto3.Session().get_credentials()
 awsauth = AWS4Auth(credentials.access_key, credentials.secret_key, region, service, session_token=credentials.token)
 
 host = '' # the Amazon ES domain, including https://
-index = 'aquasec' # You can pesonalize it as you whish
+index = 'aquasec' # You can personalize it as you whish
 type = '_doc'
 url = host + '/' + index + '/' + type + '/'
 
