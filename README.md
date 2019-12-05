@@ -118,6 +118,8 @@ The Lambda function is the code that will stream the data to Elastic Search via 
 
 Fist of all execute the **`deploy-bucket.sh`** to create the bucket base for the lambda.
 
+Update the **lambda function** with the new Elastic Search host name at **`lambda/s3-to-es.py`**.
+
 After the execution of the bucket deployment it will gerenate the **`bucket name`** that you will need to execute the next step.
 
 Now you have to update the parameters with the value from the previous step at **`deploy-lambda.sh`** and also inform the name of your **ingestion bucket**:
