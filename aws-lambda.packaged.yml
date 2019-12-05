@@ -31,7 +31,7 @@ Resources:
       Description: Function to Stream AquaSec Logs to ES.
       Handler: s3-to-es.handler
       Runtime: python3.7
-      CodeUri: s3://lambda-functions-us-east-1-665976800091/bbf70267d91c0ddf899d6c44cea0c24f
+      CodeUri: s3://...
       Role:
         Fn::GetAtt:
         - LambdaRole
