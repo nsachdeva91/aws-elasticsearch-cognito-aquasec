@@ -1,4 +1,5 @@
 aws cloudformation deploy \
+
     --template-file aws-es-domain.yml \
     --stack-name deploy-elasticsearch \
     --tags dev=cloud \
